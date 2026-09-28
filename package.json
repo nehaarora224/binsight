@@ -1,0 +1,15 @@
+{
+  "name": "binsight",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && npm install --prefix backend && npm install --prefix frontend",
+    "dev": "concurrently -n api,web -c green,blue \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "build": "npm run build --prefix frontend",
+    "start": "npm start --prefix backend",
+    "test": "npm test --prefix backend",
+    "db:reset": "npm run db:reset --prefix backend"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}
