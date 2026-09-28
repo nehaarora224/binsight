@@ -3,7 +3,8 @@ import path from 'node:path';
 import express from 'express';
 import multer from 'multer';
 import { config } from './config.js';
-import { api, HttpError } from './api.js';
+import { api } from './api.js';
+import { HttpError } from './errors.js';
 
 /** frontendDist: optional path of the built frontend to serve (standalone server only). */
 export function createApp({ frontendDist } = {}) {

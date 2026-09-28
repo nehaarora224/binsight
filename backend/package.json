@@ -5,7 +5,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "db:reset": "node src/reset-db.js",
-    "test": "node --test"
+    "test": "node --test \"test/*.test.js\""
   },
   "type": "module",
   "private": true,

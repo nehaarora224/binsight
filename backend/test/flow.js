@@ -1,15 +1,14 @@
-// Integration tests. Needs a running MySQL; uses the database named by DB_NAME (default binsight_test).
+// API flow tests, run once per data store by mysql.test.js and memory.test.js.
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-process.env.DB_NAME ??= 'binsight_test';
-const { initDatabase, closeDatabase } = await import('../src/db.js');
+const { store } = await import('../src/store/index.js');
 const { createApp } = await import('../src/app.js');
 
 let server, base;
 
 before(async () => {
-  await initDatabase({ reset: true });
+  await store.reset();
   server = createApp().listen(0);
   await new Promise(r => server.once('listening', r));
   base = `http://localhost:${server.address().port}/api`;
@@ -17,7 +16,7 @@ before(async () => {
 
 after(async () => {
   server?.close();
-  await closeDatabase();
+  await store.close();
 });
 
 const get = async p => (await fetch(base + p)).json();

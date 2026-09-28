@@ -4,7 +4,8 @@ import path from 'node:path';
 import express from 'express';
 import multer from 'multer';
 import { config } from './config.js';
-import { getPool, query } from './db.js';
+import { HttpError } from './errors.js';
+import { store } from './store/index.js';
 import { assessImage } from './assess.js';
 
 mkdirSync(config.uploadDir, { recursive: true });
@@ -18,9 +19,7 @@ const upload = multer({
   fileFilter: (_req, file, cb) => cb(null, file.mimetype.startsWith('image/')),
 });
 
-export class HttpError extends Error {
-  constructor(status, message) { super(message); this.status = status; }
-}
+export { HttpError };
 
 // ---------- mapping ----------
 
@@ -46,18 +45,18 @@ const toReport = r => ({
 // ---------- queries ----------
 
 async function getWorker() {
-  const [w] = await query('SELECT * FROM workers WHERE id = ?', [config.workerId]);
+  const w = await store.getWorker();
   if (!w) throw new HttpError(404, 'Worker not found');
   return w;
 }
 
 async function getRoute() {
-  const [r] = await query('SELECT * FROM routes WHERE worker_id = ? ORDER BY id LIMIT 1', [config.workerId]);
+  const r = await store.getRoute();
   if (!r) throw new HttpError(404, 'No route assigned');
   return r;
 }
 
-const getPoints = routeId => query('SELECT * FROM collection_points WHERE route_id = ? ORDER BY seq', [routeId]);
+const getPoints = routeId => store.getPoints(routeId);
 
 /** High-priority pending points first, then route order. */
 const nextPoint = points =>
@@ -69,8 +68,6 @@ function metresBetween(aLat, aLng, bLat, bLng) {
   return 2 * 6371000 * Math.asin(Math.sqrt(h));
 }
 
-const REPORT_SELECT = `SELECT r.*, p.seq FROM reports r JOIN collection_points p ON p.id = r.point_id`;
-
 // ---------- routes ----------
 
 export const api = express.Router();
@@ -78,8 +75,8 @@ export const api = express.Router();
 api.use('/uploads', express.static(config.uploadDir, { fallthrough: false }));
 
 api.get('/health', async (_req, res) => {
-  await query('SELECT 1');
-  res.json({ ok: true });
+  await store.ping();
+  res.json({ ok: true, store: store.name });
 });
 
 api.get('/dashboard', async (_req, res) => {
@@ -106,19 +103,16 @@ api.get('/route', async (_req, res) => {
 
 api.post('/route/start', async (_req, res) => {
   const route = await getRoute();
-  await query('UPDATE routes SET started_at = UTC_TIMESTAMP(), ended_at = NULL WHERE id = ?', [route.id]);
-  res.json(toRoute(await getRoute()));
+  res.json(toRoute(await store.startRoute(route.id)));
 });
 
 api.post('/route/end', async (_req, res) => {
   const route = await getRoute();
-  await query('UPDATE routes SET ended_at = UTC_TIMESTAMP() WHERE id = ?', [route.id]);
-  res.json(toRoute(await getRoute()));
+  res.json(toRoute(await store.endRoute(route.id)));
 });
 
 api.get('/reports', async (_req, res) => {
-  const rows = await query(`${REPORT_SELECT} WHERE r.worker_id = ? ORDER BY r.created_at DESC, r.id DESC`, [config.workerId]);
-  res.json(rows.map(toReport));
+  res.json((await store.listReports()).map(toReport));
 });
 
 /**
@@ -146,12 +140,12 @@ api.post('/assessments', upload.single('image'), async (req, res) => {
   const result = await assessImage({ imagePath: req.file.path, mimeType: req.file.mimetype, point });
   const id = randomUUID();
   const createdAt = new Date();
-  await query(
-    `INSERT INTO assessments (id, point_id, image_path, level, category, priority, action, source, lat, lng, accuracy_m, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, point.id, req.file.filename, result.level, result.category, result.priority, result.action, result.source,
-      hasFix ? lat : null, hasFix ? lng : null, Number.isFinite(accuracy) ? Math.round(accuracy) : null, createdAt],
-  );
+  await store.saveAssessment({
+    id, point_id: point.id, image_path: req.file.filename, level: result.level, category: result.category,
+    priority: result.priority, action: result.action, source: result.source,
+    lat: hasFix ? lat : null, lng: hasFix ? lng : null,
+    accuracy_m: Number.isFinite(accuracy) ? Math.round(accuracy) : null, created_at: createdAt,
+  });
   res.status(201).json({
     id, point: toPoint(point), ...result,
     imageUrl: `/api/uploads/${req.file.filename}`, createdAt,
@@ -163,33 +157,8 @@ api.post('/reports', express.json(), async (req, res) => {
   const assessmentId = req.body?.assessmentId;
   if (typeof assessmentId !== 'string') throw new HttpError(400, 'assessmentId is required');
 
-  const conn = await getPool().getConnection();
-  try {
-    await conn.beginTransaction();
-    const [[a]] = await conn.query('SELECT * FROM assessments WHERE id = ? FOR UPDATE', [assessmentId]);
-    if (!a) throw new HttpError(404, 'Assessment not found');
-    const [[used]] = await conn.query('SELECT id FROM reports WHERE assessment_id = ?', [assessmentId]);
-    if (used) throw new HttpError(409, `Already submitted as ${reportNo(used.id)}`);
-
-    const [ins] = await conn.query(
-      `INSERT INTO reports (worker_id, point_id, assessment_id, level, category, priority, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'Submitted', UTC_TIMESTAMP())`,
-      [config.workerId, a.point_id, a.id, a.level, a.category, a.priority],
-    );
-    await conn.query(
-      "UPDATE collection_points SET status = 'done', level = ?, category = ? WHERE id = ?",
-      [a.level, a.category, a.point_id],
-    );
-    await conn.commit();
-
-    const [[row]] = await conn.query(`${REPORT_SELECT} WHERE r.id = ?`, [ins.insertId]);
-    res.status(201).json(toReport(row));
-  } catch (err) {
-    await conn.rollback();
-    throw err;
-  } finally {
-    conn.release();
-  }
+  const row = await store.submitReport(assessmentId, reportNo);
+  res.status(201).json(toReport(row));
 });
 
 api.use((_req, _res, next) => next(new HttpError(404, 'Not found')));

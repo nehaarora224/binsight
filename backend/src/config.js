@@ -28,6 +28,10 @@ export const config = {
   // Serverless platforms only allow writes to the temp directory.
   uploadDir: env.UPLOAD_DIR
     ?? (env.VERCEL ? path.join(tmpdir(), 'binsight-uploads') : fileURLToPath(new URL('../uploads/', import.meta.url))),
+  // 'mysql', or 'memory' for built-in sample data without a database. On Vercel the in-memory
+  // store is used automatically until a database is configured.
+  dataStore: env.DATA_STORE
+    ?? (env.VERCEL && !env.DATABASE_URL && !env.DB_HOST ? 'memory' : 'mysql'),
   // The prototype has no login; every request acts as this worker.
   workerId: env.WORKER_ID ?? 'SW-1142',
 };

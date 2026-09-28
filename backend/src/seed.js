@@ -3,13 +3,13 @@
 const IST_OFFSET_MS = 330 * 60 * 1000;
 
 /** UTC Date for a wall-clock time in India, `daysAgo` days before today (IST). */
-function istTime(daysAgo, hh, mm) {
+export function istTime(daysAgo, hh, mm) {
   const nowIst = new Date(Date.now() + IST_OFFSET_MS);
   const utc = Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate() - daysAgo, hh, mm);
   return new Date(utc - IST_OFFSET_MS);
 }
 
-const POINTS = [
+export const POINTS = [
   // seq, area, lat, lng, distance, fill, level, category, priority, status
   [1, 'Vishal Enclave Rd', 28.637286, 77.117865, 0.0, 22, 'LOW', 'DRY', 'normal', 'done'],
   [2, 'Rajouri Garden J Block', 28.63834, 77.119281, 0.6, 55, 'MEDIUM', 'ORGANIC', 'normal', 'done'],
@@ -19,7 +19,7 @@ const POINTS = [
   [6, 'Tilak Nagar Chowk', 28.641429, 77.12117, 2.3, 52, 'MEDIUM', 'MIXED', 'normal', 'pending'],
 ];
 
-const REPORTS = [
+export const REPORTS = [
   // id, seq, daysAgo, hh, mm, level, category, priority
   [2461, 5, 2, 9, 5, 'LOW', 'ORGANIC', 'LOW'],
   [2468, 3, 1, 11, 32, 'MEDIUM', 'PLASTIC', 'NORMAL'],

@@ -43,13 +43,16 @@ npm start       # the API serves the built app at http://localhost:4000
 
 The frontend calls the API with relative `/api/...` URLs, so no API URL needs configuring.
 
-Vercel has no MySQL, so use a hosted MySQL 8 database (for example Aiven, TiDB Cloud, Railway or PlanetScale). In the Vercel project, go to **Settings → Environment Variables** and add:
+**Without a database** the backend uses built-in sample data held in memory (the same Ward 12 dataset), so the deployed app works straight away. Changes such as submitted reports or a started route last only until the serverless instance restarts, and aren't shared between instances. `/api/health` shows which store is active (`"store": "memory"` or `"mysql"`).
+
+**For permanent data**, Vercel has no MySQL, so use a hosted MySQL 8 database (for example Aiven, TiDB Cloud, Railway or PlanetScale). In the Vercel project, go to **Settings → Environment Variables** and add:
 
 | Variable | Value |
 |---|---|
 | `DATABASE_URL` | `mysql://USER:PASSWORD@HOST:PORT/DATABASE` |
 | `DB_SSL` | `true` if the provider requires TLS (most do) |
 | `AI_SERVICE_URL` | Optional, URL of the Python assessment service |
+| `DATA_STORE` | Optional: `memory` forces the sample data, `mysql` forces the database |
 
 On the first request the backend creates the tables and loads the sample data. The database itself must already exist. Uploaded photos are stored in the function's temporary directory, which is not permanent storage. The app only needs them for the assessment, and resizes them before upload to stay under Vercel's 4.5 MB request limit.
 
@@ -57,7 +60,7 @@ On the first request the backend creates the tables and loads the sample data. T
 
 | Command | What it does |
 |---|---|
-| `npm test` | Backend API tests. Uses a separate `binsight_test` database. |
+| `npm test` | Backend API tests, run against the in-memory store and MySQL (database `binsight_test`). |
 | `npm run db:reset` | Drops and recreates the database with fresh sample data. |
 
 ## How it works
