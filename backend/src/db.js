@@ -27,7 +27,12 @@ export async function initDatabase({ reset = false } = {}) {
   const admin = await mysql.createConnection(server);
   try {
     if (reset) await admin.query(`DROP DATABASE IF EXISTS \`${database}\``);
-    await admin.query(`CREATE DATABASE IF NOT EXISTS \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+    try {
+      await admin.query(`CREATE DATABASE IF NOT EXISTS \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+    } catch (err) {
+      // Hosted MySQL users often may not create databases; the provider has already created it.
+      if (reset || !['ER_DBACCESS_DENIED_ERROR', 'ER_SPECIFIC_ACCESS_DENIED_ERROR'].includes(err.code)) throw err;
+    }
   } finally {
     await admin.end();
   }

@@ -5,17 +5,18 @@ import multer from 'multer';
 import { config } from './config.js';
 import { api, HttpError } from './api.js';
 
-export function createApp() {
+/** frontendDist: optional path of the built frontend to serve (standalone server only). */
+export function createApp({ frontendDist } = {}) {
   const app = express();
   app.disable('x-powered-by');
 
   app.use('/api', api);
   app.use('/uploads', express.static(config.uploadDir, { fallthrough: false }));
 
-  // In production the backend also serves the built frontend.
-  if (existsSync(config.frontendDist)) {
-    app.use(express.static(config.frontendDist));
-    app.get(/^\/(?!api|uploads).*/, (_req, res) => res.sendFile(path.join(config.frontendDist, 'index.html')));
+  // The standalone server also serves the built frontend (on Vercel the frontend is its own service).
+  if (frontendDist && existsSync(frontendDist)) {
+    app.use(express.static(frontendDist));
+    app.get(/^\/(?!api|uploads).*/, (_req, res) => res.sendFile(path.join(frontendDist, 'index.html')));
   }
 
   app.use((err, _req, res, _next) => {

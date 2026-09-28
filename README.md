@@ -32,6 +32,27 @@ npm run build   # builds frontend/dist
 npm start       # the API serves the built app at http://localhost:4000
 ```
 
+### Deploying to Vercel
+
+`vercel.json` defines two [Vercel Services](https://vercel.com/docs/services) in one project:
+
+| Service | Folder | Framework | Serves |
+|---|---|---|---|
+| `frontend` | `frontend/` | Vite | Everything except `/api` |
+| `backend` | `backend/` | Express (`backend/index.js`) | `/api/*` |
+
+The frontend calls the API with relative `/api/...` URLs, so no API URL needs configuring.
+
+Vercel has no MySQL, so use a hosted MySQL 8 database (for example Aiven, TiDB Cloud, Railway or PlanetScale). In the Vercel project, go to **Settings → Environment Variables** and add:
+
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | `mysql://USER:PASSWORD@HOST:PORT/DATABASE` |
+| `DB_SSL` | `true` if the provider requires TLS (most do) |
+| `AI_SERVICE_URL` | Optional, URL of the Python assessment service |
+
+On the first request the backend creates the tables and loads the sample data. The database itself must already exist. Uploaded photos are stored in the function's temporary directory, which is not permanent storage. The app only needs them for the assessment, and resizes them before upload to stay under Vercel's 4.5 MB request limit.
+
 ### Other commands
 
 | Command | What it does |

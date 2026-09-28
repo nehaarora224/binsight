@@ -75,6 +75,8 @@ const REPORT_SELECT = `SELECT r.*, p.seq FROM reports r JOIN collection_points p
 
 export const api = express.Router();
 
+api.use('/uploads', express.static(config.uploadDir, { fallthrough: false }));
+
 api.get('/health', async (_req, res) => {
   await query('SELECT 1');
   res.json({ ok: true });
@@ -152,7 +154,7 @@ api.post('/assessments', upload.single('image'), async (req, res) => {
   );
   res.status(201).json({
     id, point: toPoint(point), ...result,
-    imageUrl: `/uploads/${req.file.filename}`, createdAt,
+    imageUrl: `/api/uploads/${req.file.filename}`, createdAt,
   });
 });
 

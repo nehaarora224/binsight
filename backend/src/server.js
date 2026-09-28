@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
 import { initDatabase } from './db.js';
 import { createApp } from './app.js';
@@ -11,6 +12,8 @@ try {
   process.exit(1);
 }
 
-createApp().listen(config.port, () => {
+const frontendDist = fileURLToPath(new URL('../../frontend/dist/', import.meta.url));
+
+createApp({ frontendDist }).listen(config.port, () => {
   console.log(`Binsight API listening on http://localhost:${config.port}`);
 });
